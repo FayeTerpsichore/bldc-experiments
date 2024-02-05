@@ -272,6 +272,10 @@ class PositionController:
         self.gain = 1
 
     def control(self: "PositionController", t: float, state: np.array) -> np.array:
+        """
+        A simple proportional controller that tries to keep the rotor at a constant
+        position.
+        """
         error = self.target_position - state[0]
         desired_speed = error * self.gain
         self.speed_controller.target_speed = desired_speed
