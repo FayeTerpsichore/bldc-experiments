@@ -1,0 +1,27 @@
+# Ignore virtual environment directories
+.venv/
+venv/
+env/
+
+# Ignore Poetry's virtual environment files
+.poetry/
+__pypackages__/
+
+# Ignore Python cache files
+*.pyc
+__pycache__/
+
+# Ignore local development settings
+.env
+
+# Ignore IDE and editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Ignore system and temporary files
+.DS_Store
+Thumbs.db
+*.swp
+*~
