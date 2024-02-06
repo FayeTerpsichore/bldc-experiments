@@ -25,3 +25,6 @@ __pycache__/
 Thumbs.db
 *.swp
 *~
+# Ignore generated animations
+*.mp4
+*.gif
