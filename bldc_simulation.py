@@ -121,7 +121,6 @@ class Motor:
             inner_radius,
             0,
             n_windings,
-            max_current,
             coil_resistance,
             0,
             0.5e-2,
