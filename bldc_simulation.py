@@ -14,7 +14,6 @@ class Coil:
         y: float,
         z: float,
         n_windings: int,
-        current: float,
         resistance: float,
         theta: float,
         winding_radius: float,
@@ -24,7 +23,7 @@ class Coil:
         self.y = y
         self.z = z
         self.n_windings = n_windings
-        self.current = current
+        self.current = 0
         self.resistance = resistance
         self.rotation_matrix = np.array(
             [
@@ -36,8 +35,17 @@ class Coil:
         self.theta = theta
         self.winding_radius = winding_radius
         self.winding_depth = winding_depth
+        self.Vmu_integrated = 0
+        self.inductance = (
+            scipy.constants.mu_0
+            * n_windings**2
+            * np.pi
+            * winding_radius**2
+            / winding_depth
+        )
+        self.tau = -self.resistance / self.inductance
 
-    def _l(self, t: float):
+    def _l(self, t: float) -> np.array:
         return self.rotation_matrix @ np.array(
             [
                 self.x
@@ -50,7 +58,7 @@ class Coil:
             ]
         )
 
-    def _l_dot(self, t: float):
+    def _l_dot(self, t: float) -> np.array:
         return self.rotation_matrix @ np.array(
             [
                 -2
@@ -69,7 +77,11 @@ class Coil:
             ]
         )
 
-    def B_field(self, x: float, y: float, z: float):
+    def apply_voltage(self, v: float, t: float, dt: float):
+        self.Vmu_integrated += (np.exp(self.tau * t) * v) * dt
+        self.current = self.Vmu_integrated / np.exp(self.tau * t)
+
+    def B_field(self, x: float, y: float, z: float) -> np.array:
         """
         Uses the Biot-Savart law to calculate the magnetic field due to this
         coil at a point (x, y, z).
@@ -101,7 +113,6 @@ class Motor:
         inner_radius: float,
         rotor_magnetic_moment: float,
         n_windings: int,
-        max_current: float,
         coil_resistance: float,
         rotor_moment_of_inertia: float,
     ):
