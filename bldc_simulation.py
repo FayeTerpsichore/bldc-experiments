@@ -114,7 +114,6 @@ class Motor:
         n_windings: int,
         coil_resistance: float,
         rotor_moment_of_inertia: float,
-        learner=None,
     ):
         # We need three dummy coils to model the currents for a given voltage
         # over time. Right here, though, we're just using them to determine the
@@ -162,7 +161,6 @@ class Motor:
         self.currents = []
         self.controller = None
         self.last_t = 0
-        self.learner = learner
 
     def _rhs(self: "Motor", t: float, state: np.array) -> np.array:
         """
@@ -201,7 +199,5 @@ class Motor:
         while solver.successful() and solver.t < t_max:
             print(solver.t)
             solver.integrate(solver.t + dt)
-            if self.learner is not None:
-                self.learner.update(solver.t, solver.y)
             self.states.append(solver.y)
         self.t = t_max
