@@ -24,7 +24,6 @@ class Coil:
         self.z = z
         self.n_windings = n_windings
         self.current = 0
-        self.resistance = resistance
         self.rotation_matrix = np.array(
             [
                 [np.cos(theta), -np.sin(theta), 0],
@@ -43,7 +42,7 @@ class Coil:
             * winding_radius**2
             / winding_depth
         )
-        self.tau = -self.resistance / self.inductance
+        self.tau = resistance / self.inductance
 
     def _l(self, t: float) -> np.array:
         return self.rotation_matrix @ np.array(
@@ -78,7 +77,7 @@ class Coil:
         )
 
     def apply_voltage(self, v: float, t: float, dt: float):
-        self.Vmu_integrated += (np.exp(self.tau * t) * v) * dt
+        self.Vmu_integrated += (np.exp(-self.tau * t) * v / self.inductance) * dt
         self.current = self.Vmu_integrated / np.exp(self.tau * t)
 
     def B_field(self, x: float, y: float, z: float) -> np.array:
@@ -115,17 +114,26 @@ class Motor:
         n_windings: int,
         coil_resistance: float,
         rotor_moment_of_inertia: float,
+        learner=None,
     ):
-        max_unidirectional_B = Coil(
-            0,
-            inner_radius,
-            0,
-            n_windings,
-            coil_resistance,
-            0,
-            0.5e-2,
-            1e-2,
-        ).B_field(0, 0, 0)
+        # We need three dummy coils to model the currents for a given voltage
+        # over time. Right here, though, we're just using them to determine the
+        # magnetic field at the rotor.
+        self.dummy_coils = [
+            Coil(
+                0,
+                inner_radius,
+                0,
+                n_windings,
+                coil_resistance,
+                0,
+                0.5e-2,
+                1e-2,
+            )
+            for _ in range(3)
+        ]
+        self.dummy_coils[0].current = 15
+        max_unidirectional_B = self.dummy_coils[0].B_field(0, 0, 0)
         rotation_matrix = np.array(
             [
                 [
@@ -153,6 +161,8 @@ class Motor:
         self.states = []
         self.currents = []
         self.controller = None
+        self.last_t = 0
+        self.learner = learner
 
     def _rhs(self: "Motor", t: float, state: np.array) -> np.array:
         """
@@ -162,9 +172,12 @@ class Motor:
             np.array([np.cos(state[0]), np.sin(state[0]), 0])
             * self.rotor_magnetic_moment
         )
-        input_ = self.controller.control(t, state) / (
-            self.coils_per_phase * self.coil_resistance
-        )
+        voltages = self.controller.control(t, state)
+        dt = t - self.last_t
+        for coil, voltage in zip(self.dummy_coils, voltages):
+            coil.apply_voltage(voltage, t, dt)
+        self.last_t = t
+        input_ = np.array([coil.current for coil in self.dummy_coils])
         B = sum(
             [
                 B_at_origin * input_[i // self.coils_per_phase]
@@ -186,6 +199,9 @@ class Motor:
             self.states[-1] if self.states else np.zeros(2), self.t
         )
         while solver.successful() and solver.t < t_max:
+            print(solver.t)
             solver.integrate(solver.t + dt)
+            if self.learner is not None:
+                self.learner.update(solver.t, solver.y)
             self.states.append(solver.y)
         self.t = t_max
